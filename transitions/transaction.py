@@ -104,7 +104,7 @@ while True:
     # Extract the closing price for yesterday
     yesterday_close = historical_data['Close'].iloc[-2] 
     current_value = get_current_value(symbol_option)
-    time_placeholder.metric(label="Latest Transaction Price", value=current_value, delta=str(round((current_value-yesterday_close)/yesterday_close*100, 2))+ "%")
+    time_placeholder.metric(label="Latest Transaction Price", value=current_value, delta=str(round((current_value-yesterday_close)/yesterday_close*100, 2))+ "%", help="Update per minute.")
     # time_placeholder.text(f"Latest Transaction Price: {current_value}")
-    time.sleep(60)  # Wait for 1 second
+    time.sleep(60)  # Wait for 60 second
 

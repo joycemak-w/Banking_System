@@ -26,7 +26,7 @@ sm = df
 
 option = st.selectbox(
     "Stock: ",
-    sm['Name'] +  " ( " + sm['Symbol'] + " )",
+    sm['Name'] + " ( " + sm['Symbol'] + " )",
     index=None,
     placeholder="Select Stock...",
 )
@@ -35,8 +35,9 @@ st.write("You selected:", option)
 
 
 if(option != None):
-    symbol_option = df[df['Name'] == (option.split(" ")[0])]['Symbol'].iloc[0]
-    # st.write(symbol_option)
+    symbol_option = df[df['Name'] == (option.split(" (")[0])]['Symbol'].iloc[0]
+    name_option = df[df['Name'] == (option.split(" (")[0])]['Name'].iloc[0]
+    # st.write(name_option)
     stock = yf.Ticker(symbol_option)
     closep_stock = stock.history(period="2y")
     # # st.dataframe(closep_stock)
@@ -240,6 +241,40 @@ if(option != None):
         st.write(":red[Overbought Date Range: ]")
         st.dataframe(overbought, hide_index=True, use_container_width=True)
 
+    # Load stock symbols from CSV
+    hsi_df = pd.read_csv('hang_seng_index.csv')
+    hsi_sm = hsi_df['Symbol'].to_list()
 
+    if symbol_option not in hsi_sm:
+        hsi_sm.append(symbol_option)
+
+    # Initialize an empty DataFrame to store successful downloads
+    hsi_data = pd.DataFrame()
+
+    # Fetch historical stock data, ignoring stocks that fail to download
+    for symbol in hsi_sm:
+        try:
+            stock_data = yf.download(symbol, period='2y')['Adj Close']
+            if not stock_data.empty:
+                hsi_data[symbol] = stock_data
+        except Exception as e:
+            print(f"Failed to download data for {symbol}: {e}")
+
+    # Drop rows with missing values
+    hsi_data.dropna(inplace=True)
+
+    # Calculate correlation with search_s
+    correlation = hsi_data.corr()[symbol_option]
+    strong_positive_correlation = correlation[correlation >= 0.8]
+    strong_negative_correlation = correlation[correlation <= -0.8]
+    
+
+    col_positive_correlation, col_negative_correlation = st.columns([1,1])
+    with col_positive_correlation:
+        st.write(":green[Strongly positive correlated stocks: ]")
+        st.dataframe(strong_positive_correlation, use_container_width=True)
+    with col_negative_correlation:
+        st.write(":red[Strongly negative correlated stocks: ]")
+        st.dataframe(strong_negative_correlation, use_container_width=True)
         
         
