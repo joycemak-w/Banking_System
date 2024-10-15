@@ -27,7 +27,7 @@ st.write("You selected:", option)
 
 
 if(option != None):
-    symbol_option = df[df['Name'] == (option.split(" ")[0])]['Symbol'].iloc[0]
+    symbol_option = df[df['Name'] == (option.split(" (")[0])]['Symbol'].iloc[0]
     stock = yf.Ticker(symbol_option)
 
     time_placeholder = st.empty()
