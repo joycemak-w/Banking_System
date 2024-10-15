@@ -67,3 +67,43 @@ def rsi_over(symbol_option):
 
     return overbought_dates, oversold_dates
 
+def correlation(symbol_options):
+    hsi_df = pd.read_csv('hang_seng_index.csv')
+    hsi_sm = hsi_df['Symbol'].to_list()
+
+    for symbol_option in symbol_options:
+        if symbol_option not in hsi_sm:
+            hsi_sm.append(symbol_option)
+
+    # Initialize an empty DataFrame to store successful downloads
+    hsi_data = pd.DataFrame()
+
+    # Fetch historical stock data, ignoring stocks that fail to download
+    for symbol in hsi_sm:
+        try:
+            stock_data = yf.download(symbol, period='2y')['Adj Close']
+            if not stock_data.empty:
+                hsi_data[symbol] = stock_data
+        except Exception as e:
+            print(f"Failed to download data for {symbol}: {e}")
+
+    # Drop rows with missing values
+    hsi_data.dropna(inplace=True)
+
+    # Calculate correlation with search_s
+    strong_positive_correlation = {}
+    strong_negative_correlation = {}
+    strong_correlation = {}
+    
+    for symbol_option in symbol_options:
+        correlation_series = hsi_data.corr()[symbol_option]
+        strong_positive_correlation[symbol_option] = correlation_series[correlation_series >= 0.8]
+        strong_negative_correlation[symbol_option] = correlation_series[correlation_series <= -0.8]
+
+    return strong_positive_correlation, strong_negative_correlation
+
+# Example usage
+symbol_list = ['0005.HK', '0700.HK']
+p, n = correlation(symbol_list)
+st.write(p.get('0005.HK', 'No strong positive correlations'))
+st.write(n.get('0005.HK', 'No strong negative correlations'))
