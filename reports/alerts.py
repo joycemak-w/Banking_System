@@ -3,7 +3,8 @@ import sqlite3
 import pandas as pd
 import yfinance as yf
 import numpy as np
-from datetime import datetime 
+from datetime import datetime, date, timedelta
+import pytz
 
 def sma_cross(symbol_option):
     stock = yf.Ticker(symbol_option)
@@ -25,11 +26,15 @@ def sma_cross(symbol_option):
 
     # Loop to collect cross points
     for i in range(1, len(closep_stock)):
-        if closep_stock['Signal'].iloc[i] == 1 and closep_stock['Signal'].iloc[i-1] == 0:
-            cross_points.append((closep_stock.index[i], closep_stock['Close'].iloc[i], 'up'))
-        elif closep_stock['Signal'].iloc[i] == -1 and closep_stock['Signal'].iloc[i-1] == 0:
-            cross_points.append((closep_stock.index[i], closep_stock['Close'].iloc[i], 'down'))
-    return cross_points
+        if datetime.fromisoformat(str(closep_stock.index[i])).date() >= date.today() - timedelta(days=30):
+            if closep_stock['Signal'].iloc[i] == 1 and closep_stock['Signal'].iloc[i-1] == 0:
+                cross_points.append((closep_stock.index[i], closep_stock['Close'].iloc[i], 'up'))
+            elif closep_stock['Signal'].iloc[i] == -1 and closep_stock['Signal'].iloc[i-1] == 0:
+                cross_points.append((closep_stock.index[i], closep_stock['Close'].iloc[i], 'down'))
+    if cross_points != []:
+        return cross_points[-1]
+    else:
+        pass
 
 def rsi_over(symbol_option):
     stock = yf.Ticker(symbol_option)
@@ -67,6 +72,41 @@ def rsi_over(symbol_option):
 
     return overbought_dates, oversold_dates
 
+# def correlation(symbol_options):
+#     hsi_df = pd.read_csv('hang_seng_index.csv')
+#     hsi_sm = hsi_df['Symbol'].to_list()
+
+#     for symbol_option in symbol_options:
+#         if symbol_option not in hsi_sm:
+#             hsi_sm.append(symbol_option)
+
+#     # Initialize an empty DataFrame to store successful downloads
+#     hsi_data = pd.DataFrame()
+
+#     # Fetch historical stock data, ignoring stocks that fail to download
+#     for symbol in hsi_sm:
+#         try:
+#             stock_data = yf.download(symbol, period='1mo')['Adj Close']
+#             if not stock_data.empty:
+#                 hsi_data[symbol] = stock_data
+#         except Exception as e:
+#             print(f"Failed to download data for {symbol}: {e}")
+
+#     # Drop rows with missing values
+#     hsi_data.dropna(inplace=True)
+
+#     # Calculate correlation with search_s
+#     strong_positive_correlation = {}
+#     strong_negative_correlation = {}
+#     strong_correlation = {}
+    
+#     for symbol_option in symbol_options:
+#         correlation_series = hsi_data.corr()[symbol_option]
+#         strong_positive_correlation[symbol_option] = correlation_series[correlation_series >= 0.8]
+#         strong_negative_correlation[symbol_option] = correlation_series[correlation_series <= -0.8]
+
+#     return strong_positive_correlation, strong_negative_correlation
+
 def correlation(symbol_options):
     hsi_df = pd.read_csv('hang_seng_index.csv')
     hsi_sm = hsi_df['Symbol'].to_list()
@@ -75,35 +115,46 @@ def correlation(symbol_options):
         if symbol_option not in hsi_sm:
             hsi_sm.append(symbol_option)
 
-    # Initialize an empty DataFrame to store successful downloads
     hsi_data = pd.DataFrame()
 
     # Fetch historical stock data, ignoring stocks that fail to download
     for symbol in hsi_sm:
         try:
-            stock_data = yf.download(symbol, period='2y')['Adj Close']
+            stock_data = yf.download(symbol, period='1mo')['Adj Close']
             if not stock_data.empty:
                 hsi_data[symbol] = stock_data
         except Exception as e:
             print(f"Failed to download data for {symbol}: {e}")
 
-    # Drop rows with missing values
     hsi_data.dropna(inplace=True)
 
-    # Calculate correlation with search_s
-    strong_positive_correlation = {}
-    strong_negative_correlation = {}
     strong_correlation = {}
     
     for symbol_option in symbol_options:
-        correlation_series = hsi_data.corr()[symbol_option]
-        strong_positive_correlation[symbol_option] = correlation_series[correlation_series >= 0.8]
-        strong_negative_correlation[symbol_option] = correlation_series[correlation_series <= -0.8]
+        strong_correlation[symbol_option] = {'positive': [], 'negative': []}
+        if symbol_option in hsi_data.columns:
+            correlation_series = hsi_data.corr()[symbol_option]
+            strong_correlation[symbol_option]['positive'] = correlation_series[correlation_series >= 0.8].index.tolist()
+            strong_correlation[symbol_option]['negative'] = correlation_series[correlation_series <= -0.8].index.tolist()
 
-    return strong_positive_correlation, strong_negative_correlation
+    return strong_correlation
 
-# Example usage
-symbol_list = ['0005.HK', '0700.HK']
-p, n = correlation(symbol_list)
-st.write(p.get('0005.HK', 'No strong positive correlations'))
-st.write(n.get('0005.HK', 'No strong negative correlations'))
+symbol_list = ['0388.HK', '0700.HK']
+with st.spinner(text="Loading the notifications..."):
+    # p, n = correlation(symbol_list)
+    # st.write(p.get('0388.HK', 'No strong positive correlations'))
+    # st.write(n.get('0388.HK', 'No strong negative correlations'))
+    correlation_results = correlation(symbol_list)
+    for symbol_option, correlations in correlation_results.items():
+        # st.write(symbol_option)
+        # st.write(correlations)
+        st.write(sma_cross(symbol_option))
+        # st.write(rsi_over(symbol_option))
+        st.subheader("P")
+        for correlation in correlations['positive']:
+            
+            st.write(sma_cross(correlation))
+        st.subheader("N")
+        for correlation in correlations['negative']:
+            
+            st.write(sma_cross(correlation))
