@@ -12,16 +12,16 @@ import time
 # Read the CSV file into a DataFrame
 # df = pd.read_csv('valid_tickers.csv')
 # sm = df[df[' market_cap'] == " HKD"]['validity']
+# sm = pd.read_csv('hk_tickers.csv')
 df = pd.read_csv('hk_tickers.csv')
-sm = df
-
+# sm = df
 # print(sm)
 
 col1, col2= st.columns([2,1])
 with col1:
     stock_option = st.selectbox(
         "Stock: ",
-        sm['Name'] +  " ( " + sm['Symbol'] + " )",
+        df['Name'] +  " ( " + df['Symbol'] + " )",
         placeholder="Select Stock...",
     )
 with col2:
@@ -51,44 +51,46 @@ def get_current_value(symbol):
     # total_value = round(stock_value*volume, 2)
     # return total_value
 
-volume = st.number_input(option + " Volume: ", min_value=100, value=100)
+volume = st.number_input(option + " Volume: ", min_value=1, value=1)
 formatted_date = date.today().strftime('%Y-%m-%d')
-symbol_option = df[df['Name'] == (stock_option.split(" ")[0])]['Symbol'].iloc[0]
+symbol_option = df[df['Name'] == (stock_option.split(" (")[0])]['Symbol'].iloc[0]
 stock_current_price = get_current_value(symbol_option)
 # stock_current_value = round(get_current_value(symbol_option) * volume, 2)
 stock_current_value = math.ceil((stock_current_price * volume) * 100) / 100
 if st.button("Confirm", key='d_confirm'):
     if stock_option != None:
         if option == "Buy":
-            if volume >= 100:
+            if volume >= 1:
                 c.execute("SELECT SUM(amount) FROM balance_record WHERE user_id = ?", (user_info[0],))
                 total_amount = c.fetchone()[0]
                 if total_amount >= volume * stock_current_price:
                     c.execute("INSERT INTO stock_record (user_id, symbol, volume, price, date) VALUES (?, ?, ?, ?, ?)", 
-                            (user_info[0], stock_option, volume, stock_current_value, formatted_date))
+                            (user_info[0], symbol_option, volume, stock_current_price, formatted_date))
                     c.execute("INSERT INTO balance_record (user_id, reason, amount, date) VALUES (?, ?, ?, ?)", 
-                            (user_info[0], f'Buy {stock_option}', -stock_current_value, formatted_date))
+                            (user_info[0], f'Buy {symbol_option}', -stock_current_value, formatted_date))
                     conn.commit()
                     st.success(f"Buy " + str(volume) + " of " + stock_option + "successfully!")
                 else:
                     st.error(f"Your bank account do not have enough balance.")
             else:
-                st.error(f"Volume should be larger than or equal to 100.")
+                st.error(f"Volume should be larger than or equal to 1.")
         elif option == "Sell":
-            if volume >= 100:
-                c.execute("SELECT SUM(volume) FROM stock_record WHERE user_id = ? AND symbol = ?", (user_info[0], stock_option,))
-                total_volume = c.fetchone()[0]
-                if total_volume >= volume:
+            if volume >= 1:
+                c.execute("SELECT SUM(volume) FROM stock_record WHERE user_id = ? AND symbol = ?", (user_info[0], symbol_option,))
+                fetchone_volume = c.fetchone()
+                total_volume = int(0 if fetchone_volume is None or fetchone_volume[0] is None else fetchone_volume[0])
+                st.write(total_volume)
+                if total_volume >= int(volume):
                     c.execute("INSERT INTO stock_record (user_id, symbol, volume, price, date) VALUES (?, ?, ?, ?, ?)", 
-                            (user_info[0], stock_option, -volume, stock_current_price, formatted_date))
+                            (user_info[0], symbol_option, -volume, stock_current_price, formatted_date))
                     c.execute("INSERT INTO balance_record (user_id, reason, amount, date) VALUES (?, ?, ?, ?)", 
-                            (user_info[0], f'Sell {stock_option}', (volume * stock_current_price), formatted_date))
+                            (user_info[0], f'Sell {symbol_option}', stock_current_value, formatted_date))
                     conn.commit()
                     st.success(f"Sell " + str(volume) + " of " + stock_option + "successfully!")
                 else:
                     st.error(f"Your selected volume {str(volume)} is larger than your owned volume {str(total_volume)}.")
             else:
-                st.error(f"Volume should be larger than or equal to 100.")
+                st.error(f"Volume should be larger than or equal to 1.")
     else:
         st.error(f"You should select a stock.")
 # Update the time every second
