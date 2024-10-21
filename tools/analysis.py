@@ -53,11 +53,11 @@ if(option != None):
     # fig.update_layout(title='Candle Stick', xaxis_rangeslider_visible=True)
     # # closep_stock
     # st.plotly_chart(fig, theme='streamlit')
-
-    # Calculate moving averages
+    
     tab1, tab2, tab3 = st.tabs(["Simple Moving Average", "Relative Strength Index", "Positive/Negative correlated Stocks"])
 
     with tab1:
+        # Calculate moving averages
         short_window = 20
         long_window = 100
 

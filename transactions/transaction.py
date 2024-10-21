@@ -79,7 +79,7 @@ if st.button("Confirm", key='d_confirm'):
                 c.execute("SELECT SUM(volume) FROM stock_record WHERE user_id = ? AND symbol = ?", (user_info[0], symbol_option,))
                 fetchone_volume = c.fetchone()
                 total_volume = int(0 if fetchone_volume is None or fetchone_volume[0] is None else fetchone_volume[0])
-                st.write(total_volume)
+                # st.write(total_volume)
                 if total_volume >= int(volume):
                     c.execute("INSERT INTO stock_record (user_id, symbol, volume, price, date) VALUES (?, ?, ?, ?, ?)", 
                             (user_info[0], symbol_option, -volume, stock_current_price, formatted_date))
