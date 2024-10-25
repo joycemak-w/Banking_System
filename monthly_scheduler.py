@@ -28,7 +28,7 @@ def calculate_monthly_interest(balance, records, start_date, end_date, daily_rat
 
     return total_interest
 
-# today = datetime(2024, 10, 1)
+# today = datetime(2025, 1, 1)
 today = datetime.now().date()
 def get_previous_month_dates():
     first_day_of_this_month = today.replace(day=1)
@@ -80,7 +80,7 @@ def job():
     # Fetch balance records from the database
     balance_records = fetch_monthly_balance_records(start_date, end_date)
     pre_balance_records = fetch_pre_balance_records(start_date)
-    user_ids = {item['user_id'] for item in balance_records}
+    user_ids = {item['user_id'] for item in pre_balance_records}
     conn = sqlite3.connect('./banking_system.db')  # Update with your database file
     cursor = conn.cursor()
     for i in user_ids:
