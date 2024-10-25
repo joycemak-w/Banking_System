@@ -6,21 +6,34 @@ from datetime import date, timedelta, datetime
 import yfinance as yf
 from schedule import every, repeat, run_pending
 import time
+import pandas as pd
 
-# st.write(st.session_state.user)
-# st.subheader(f"Welcome, {st.session_state.user}!")
-tab1, tab2 = st.tabs(["Stock Trading Overview", "Cash Flow Overview"])
-with tab1:
-    st.subheader("Stock Trading Overview")
-    st.markdown("Current Gain / Loss in stocks")
-    current_gain_loss_placeholder = st.empty()
 
 conn = sqlite3.connect('banking_system.db')
 c = conn.cursor()
+c.execute("SELECT * FROM users WHERE username = ?", (st.session_state.user,))
+user_info = c.fetchone()
+
+# st.write(st.session_state.user)
+# st.subheader(f"Welcome, {st.session_state.user}!")
+
+tab1, tab2 = st.tabs(["Balance Overview", "Cash Flow Overview"])
+with tab1:
+    st.subheader("Balance Overview")
+    st.markdown("Current Gain / Loss in stocks", help="Refresh per minute.")
+    current_gain_loss_placeholder = st.empty()
+
+    st.markdown("Total Assets", help="Refresh per minute.")
+    total_assets_placeholder = st.empty()
+
+    # st.markdown("Total Gain / Loss in selling stocks")
+    # c.execute("SELECT symbol, SUM(volume*price) AS total_amount FROM stock_record WHERE user_id = ? and volume < 0 group by symbol", (user_info[0],))
+    # total_amount = pd.DataFrame(c.fetchall()).set_index(0)
+    # st.write(total_amount)
+    # fig=st.bar_chart(total_amount, horizontal=True)
+
 with tab2:
     st.subheader("Cash Flow Overview")
-    c.execute("SELECT * FROM users WHERE username = ?", (st.session_state.user,))
-    user_info = c.fetchone()
     # st.table(df)
 
     query = f"""
@@ -54,6 +67,7 @@ with tab2:
     SELECT
         SUM(CASE WHEN reason = 'Deposit' then amount else 0 end) as deposit,
         SUM(CASE WHEN reason LIKE 'Sell%' then amount else 0 end) as sell_stock,
+        SUM(CASE WHEN reason LIKE 'Interest' then amount else 0 end) as interest,
         SUM(CASE WHEN reason = 'Withdrawal' then amount else 0 end) as withdrawal,
         SUM(CASE WHEN reason LIKE 'Buy%' then amount else 0 end) as buy_stock
     FROM balance_record
@@ -66,15 +80,15 @@ with tab2:
     with pie_column1:
         # st.markdown("Increasement")
         fig=go.Figure()
-        fig.add_trace(go.Pie(labels=df_pie_chart.iloc[0][:2].index, values=df_pie_chart.iloc[0][:2].values, marker=dict(colors=['green', '#03fcb1']), textposition='inside',sort=False, direction='clockwise', textinfo='label+value+percent'))
-        fig.update_layout(title = "Increasement in balance")
-        st.plotly_chart(fig) 
+        fig.add_trace(go.Pie(labels=df_pie_chart.iloc[0][:3].index, values=df_pie_chart.iloc[0][:3].values, marker=dict(colors=['#156b39', 'green', '#03fcb1']), textposition='inside',sort=False, direction='clockwise', textinfo='label+value+percent'))
+        fig.update_layout(title = "Increasement in cash")
+        st.plotly_chart(fig, key="increase") 
     with pie_column2:
         # st.markdown("Decreasement")
         fig=go.Figure()
-        fig.add_trace(go.Pie(labels=df_pie_chart.iloc[0][2:4].index, values=-df_pie_chart.iloc[0][2:4].values, marker=dict(colors=['red', '#e88780']), textposition='inside', sort=False, direction='clockwise', textinfo='label+value+percent'))
-        fig.update_layout(title = "Decreasement in balance")
-        st.plotly_chart(fig) 
+        fig.add_trace(go.Pie(labels=df_pie_chart.iloc[0][3:5].index, values=-df_pie_chart.iloc[0][3:5].values, marker=dict(colors=['red', '#e88780']), textposition='inside', sort=False, direction='clockwise', textinfo='label+value+percent'))
+        fig.update_layout(title = "Decreasement in cash")
+        st.plotly_chart(fig, key="decrease") 
 
     # query = f"""
     # SELECT
@@ -135,18 +149,55 @@ def get_current_value(symbol):
     stock = yf.Ticker(symbol)
     # stock.info.get('currentPrice')
     todayData = stock.history(period='1d')
-    stock_value = todayData['Close'].iloc[0]
-    return round(stock_value, 2)
+    if todayData.empty:
+        return 0
+    else:
+        stock_value = todayData['Close'].iloc[0]
+        return round(stock_value, 2)
+        
 
 while True:
+    query = f"""
+    SELECT
+        SUM(CASE WHEN reason = 'Deposit' then amount else 0 end) as deposit,
+        SUM(CASE WHEN reason LIKE 'Interest' then amount else 0 end) as interest
+    FROM balance_record
+    WHERE user_id = {user_info[0]} 
+    """
+    # Read data into a DataFrame
+    cash = pd.read_sql_query(query, conn)
+    totalvalue = 0
     for symbol_option in df_current_gain_loss.index:
         if df_current_gain_loss.loc[symbol_option, 'volume'] != 0:
-            df_current_gain_loss.loc[symbol_option, 'p_price'] = round(df_current_gain_loss.loc[symbol_option, 'total'] / df_current_gain_loss.loc[symbol_option, 'volume'], 2)
-            df_current_gain_loss.loc[symbol_option, 'c_price'] = get_current_value(symbol_option)
-            df_current_gain_loss.loc[symbol_option, 'gain / loss ($)'] = round(df_current_gain_loss.loc[symbol_option,'c_price'] * df_current_gain_loss.loc[symbol_option,'volume'] - df_current_gain_loss.loc[symbol_option,'total'], 2)
-            df_current_gain_loss.loc[symbol_option, 'gain / loss (%)'] = str(round((df_current_gain_loss.loc[symbol_option,'c_price'] - df_current_gain_loss.loc[symbol_option, 'p_price']) / df_current_gain_loss.loc[symbol_option, 'p_price']*100,2)) + "%"
+            if symbol_option != 'Total':
+                df_current_gain_loss.loc[symbol_option, 'p_price'] = round(df_current_gain_loss.loc[symbol_option, 'total'] / df_current_gain_loss.loc[symbol_option, 'volume'], 2)
+                current_price = get_current_value(symbol_option)
+                df_current_gain_loss.loc[symbol_option, 'c_price'] = current_price
+                cash.loc[0, symbol_option] = round(current_price * df_current_gain_loss.loc[symbol_option, 'volume'], 2)
+                df_current_gain_loss.loc[symbol_option, 'gain / loss (%)'] = str(round((df_current_gain_loss.loc[symbol_option,'c_price'] - df_current_gain_loss.loc[symbol_option, 'p_price']) / df_current_gain_loss.loc[symbol_option, 'p_price']*100,2)) + "%"
+                actualvalue = round(df_current_gain_loss.loc[symbol_option,'c_price'] * df_current_gain_loss.loc[symbol_option,'volume'] - df_current_gain_loss.loc[symbol_option,'total'], 2)
+                df_current_gain_loss.loc[symbol_option, 'gain / loss ($)'] = actualvalue
+                totalvalue += actualvalue
         else:
             df_current_gain_loss.drop(symbol_option)
-    current_gain_loss_placeholder.dataframe(df_current_gain_loss)
+    df_current_gain_loss.loc['Total', 'gain / loss ($)'] = totalvalue 
+    current_gain_loss_placeholder.dataframe(df_current_gain_loss, key="gain_loss")
+
+    fig=go.Figure()
+    fig.add_trace(go.Pie(labels=cash.columns, values=cash.iloc[0].tolist(), textposition='auto', sort=False, textinfo='label+percent'))
+    # fig.update_layout(title = "Total Assets")
+    # st.plotly_chart(fig)
+    total_assets_placeholder.plotly_chart(fig) 
+    # total_assets_placeholder.write(cash.values)
+    
+    # closep_stock = yf.Ticker("1810.HK").history(interval='1d', period='2y')
+    # fig = go.Figure(data=[go.Candlestick(x=closep_stock.index,
+    #                                 open=closep_stock['Open'],
+    #                                 high=closep_stock['High'],
+    #                                 low=closep_stock['Low'],
+    #                                 close=closep_stock['Close'])])
+    # # closep_stock
+    # total_assets_placeholder.plotly_chart(fig)
+
     time.sleep(60)  # Wait for 60 second
 

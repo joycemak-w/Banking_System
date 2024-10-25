@@ -35,7 +35,7 @@ def main():
     signup_page = st.Page("signup.py", title="Sign Up", icon=":material/person_add:")
 
     dashboard = st.Page("reports/dashboard.py", title="Dashboard", icon=":material/dashboard:")
-    alerts = st.Page("reports/alerts.py", title="System alerts", icon=":material/notification_important:")
+    alerts = st.Page("reports/alerts.py", title="Alerts", icon=":material/notification_important:")
 
     search = st.Page("tools/search.py", title="Search", icon=":material/query_stats:")
     analysis = st.Page("tools/analysis.py", title="Stock Analysis", icon=":material/search_insights:", default=True)
